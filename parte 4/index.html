@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Document</title>
+        <script src="https://reference.dashif.org/dash.js/latest/dist/dash.all.debug.js"> </script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style type="text/css">
+            .code {
+                width: 540px;
+                margin: auto;
+            }
+        
+            video {
+                width: 540px;
+            }
+        
+            .chart {
+                width: 540px;
+                margin: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="code">
+            <video class="dashjs-player" autoplay controls preload="auto" muted>
+            </video>
+        </div>
+        <div class="code">
+            <p>Video Bitrate: <span id="bitrate"></span> kbps</p>
+            <p>Video Buffer: <span id="buffer"></span> seconds</p>
+            <p>Video Representation: <span id="representation"></span></p>
+        </div>
+        <div class="chart">
+            <canvas id="myChart" ></canvas>
+        </div>
+        <script>
+            const data = {
+            datasets: [{
+                labels:[],
+                data:[], 
+                label: 'Buffer Level (s)',
+                borderColor: '#FF5369',
+                fill: false,
+                yAxisID: 'y1'
+            },
+            {
+                labels:[],
+                data:[], 
+                label: 'Video Bitrate (Kbps)',
+                borderColor: '#003D8F',
+                fill: true,
+                yAxisID: 'y2'
+            }
+        ]
+        };
+        const config = {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    scales: {
+                        y1: {
+                            title: {
+                                display: true,
+                                text: 'Buffer Level (s)',
+                            },
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                        },
+                        y2: {
+                            title: {
+                                display: true,
+                                text: 'Video Bitrate (Kbps)',
+                            },
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                        },
+                    },
+                }
+            };
+        const myChart = new Chart(
+            document.getElementById('myChart'),
+            config
+            );
+            document.addEventListener("DOMContentLoaded", function () {
+                init();
+            });
+            function init() {
+                var video,
+                    player,
+                    mpd_url = "./output/stream.mpd";
+                video = document.querySelector("video");
+                player = dashjs.MediaPlayer().create();
+                player.initialize(video, mpd_url, true);
+                player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
+                    clearInterval(eventPoller);
+                });
+                var eventPoller = setInterval(function () {
+                    var streamInfo = player.getActiveStream().getStreamInfo();
+                    var dashMetrics = player.getDashMetrics();
+                    var dashAdapter = player.getDashAdapter();
+                    if (dashMetrics && streamInfo) {
+                        const periodIdx = streamInfo.index;
+                        var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
+                        var bufferLevel = dashMetrics.getCurrentBufferLevel('video', true);
+                        var bitrate = repSwitch ? Math.round(dashAdapter.
+                            getBandwidthForRepresentation(repSwitch.to,
+                                periodIdx) / 1000) : NaN;
+                        document.getElementById('buffer').innerText = bufferLevel + " secs";
+                        document.getElementById('bitrate').innerText = bitrate + " Kbps";
+                        document.getElementById('representation').innerText = repSwitch.to;
+                         //Conversion of the actual moment to H:M:S and adition to the chart by addDAta function
+                        let time = new Date();
+                        let hours = time.getHours();
+                        let minutes = time.getMinutes();
+                        let seconds = time.getSeconds();
+                        addData(myChart, hours+":"+minutes+":"+seconds, bufferLevel, bitrate)
+                    }
+                }, 500);
+            }
+            //addData ads to the chart time in label (x) and bufferLevel and bitrate in label (y)
+            function addData(chart, label, data1, data2) {
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(data1);
+                chart.data.datasets[1].data.push(data2);
+                chart.update();
+            }
+        </script>
+    </body>
+</html>
